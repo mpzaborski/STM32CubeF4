@@ -35,6 +35,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "ssd1306.h"
+#include "string.h"
+#include <stdio.h>
 
 /** @addtogroup STM32F4xx_HAL_Examples
   * @{
@@ -46,13 +49,110 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
+#define I2C_MASTER_ADDRESS        0xFF
+#define I2C_TIMING      0x40912732
+#define I2C_SLAVE_ADDRESS 0x30
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef UartHandle;
+I2C_HandleTypeDef I2cHandle;
+
+
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
 static void Error_Handler(void);
 
 /* Private functions ---------------------------------------------------------*/
+
+void UartInit(void)
+{
+  UartHandle.Instance        = USART2;
+  UartHandle.Init.BaudRate   = 115200;
+  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
+  UartHandle.Init.StopBits   = UART_STOPBITS_1;
+  UartHandle.Init.Parity     = UART_PARITY_NONE;
+  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+  UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
+  UartHandle.Init.Mode       = UART_MODE_TX_RX;
+
+  HAL_UART_Init(&UartHandle);
+}
+
+void I2cInit(void)
+{
+  /*##-1- Configure the I2C peripheral ######################################*/
+  I2cHandle.Instance             = I2Cx;
+  I2cHandle.Init.ClockSpeed      = 400000;
+  I2cHandle.Init.AddressingMode  = I2C_ADDRESSINGMODE_7BIT;
+  I2cHandle.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  I2cHandle.Init.DutyCycle       = I2C_DUTYCYCLE_16_9;
+  I2cHandle.Init.OwnAddress1     = I2C_MASTER_ADDRESS;
+  I2cHandle.Init.OwnAddress2     = 0xFE;
+  I2cHandle.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  I2cHandle.Init.NoStretchMode   = I2C_NOSTRETCH_DISABLE;
+
+  if(HAL_I2C_Init(&I2cHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    Error_Handler();
+  }
+}
+
+#define POSITIVE_TEMPERATURE_RANGE 0x7FF
+
+#define MCP9808_TEMPERATURE_AMBIENT 0x05
+#define MCP9808_MANUFACTURER_ID 0x06
+
+// Example of temperature conversion. Potentially some errors there (i.e negative temperature)
+// https://www.digikey.pl/en/maker/projects/getting-started-with-stm32-i2c-example/ba8c2bfef2024654b5dd10012425fa23
+
+void mcp9808_read_temperature(char* result_buffer)
+{
+  uint16_t temperature;
+  float f_temperature;
+  HAL_I2C_Mem_Read(&I2cHandle, I2C_SLAVE_ADDRESS, MCP9808_TEMPERATURE_AMBIENT, 1, (uint8_t*)&temperature, sizeof(temperature), HAL_MAX_DELAY);
+  /* swap beacuse of endianess */
+  temperature = __REV16(temperature);
+  /* ignore alert pin state bits */
+  temperature = temperature & 0x1fff;
+  if ( temperature > POSITIVE_TEMPERATURE_RANGE)
+  {
+    temperature = ~temperature;
+    temperature+=1;
+    temperature = temperature & 0x7ff;
+    f_temperature = temperature * 0.0625;
+    f_temperature *= 100;
+    sprintf(result_buffer, "-%d.%d C", (int)f_temperature / 100, ((int) f_temperature % 100)/10);
+  }
+  else
+  {
+    temperature = temperature & 0x7ff;
+    f_temperature = temperature * 0.0625;
+    f_temperature *= 100;
+    sprintf(result_buffer, "%d.%d C", (int)f_temperature / 100, ((int) f_temperature % 100)/10);
+  }
+}
+
+uint16_t mcp9808_read_manufacturer_id(char* buffer)
+{
+  uint16_t manufacturer_id=0xabcd;
+
+  HAL_I2C_Mem_Read(&I2cHandle, I2C_SLAVE_ADDRESS, MCP9808_MANUFACTURER_ID, 1, (uint8_t*)&manufacturer_id, sizeof(manufacturer_id), HAL_MAX_DELAY);
+
+  manufacturer_id = __REV16(manufacturer_id);
+  sprintf(buffer, "manufacturer id: 0x%02x\r\n", manufacturer_id);
+  return manufacturer_id;
+}
+
+void ssd1306_print_temperature(char* buffer)
+{
+  ssd1306_Fill(White);
+  ssd1306_SetCursor(2, 0);
+  ssd1306_WriteString("Temperature", Font_11x18, Black);
+  ssd1306_SetCursor(2,18);
+  ssd1306_WriteString(buffer, Font_11x18, Black);
+  ssd1306_UpdateScreen();
+}
 
 /**
   * @brief  Main program
@@ -61,31 +161,49 @@ static void Error_Handler(void);
   */
 int main(void)
 {
+  char buffer[40];
+  uint16_t result;
 
   /* STM32F4xx HAL library initialization:
        - Configure the Flash prefetch, Flash preread and Buffer caches
-       - Systick timer is configured by default as source of time base, but user 
-             can eventually implement his proper time base source (a general purpose 
-             timer for example or other time source), keeping in mind that Time base 
-             duration should be kept 1ms since PPP_TIMEOUT_VALUEs are defined and 
+       - Systick timer is configured by default as source of time base, but user
+             can eventually implement his proper time base source (a general purpose
+             timer for example or other time source), keeping in mind that Time base
+             duration should be kept 1ms since PPP_TIMEOUT_VALUEs are defined and
              handled in milliseconds basis.
        - Low Level Initialization
      */
   HAL_Init();
-  
-  /* Configure the System clock to 84 MHz */
+
+  /* Configure the System clock to have a frequency of 216 MHz */
   SystemClock_Config();
-  
 
-  /* Add your application code here
-     */
+  /* -1- Enable GPIOA Clock (to be able to program the configuration registers) */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
 
-  /* Infinite loop */
-  while (1)
-  {    
+  UartInit();
+  I2cInit();
+
+  result = mcp9808_read_manufacturer_id(buffer);
+
+  assert_param(result == 0x54);
+
+  HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
+
+  ssd1306_Init();
+
+  while(1)
+  {
+    /*##-5- Get the converted value of regular channel  ########################*/
+    mcp9808_read_temperature(buffer);
+
+    HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
+    ssd1306_print_temperature(buffer);
+    HAL_Delay(1000);
   }
 }
+
 
 /**
   * @brief  System Clock Configuration
@@ -145,7 +263,19 @@ static void SystemClock_Config(void)
   if(HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
-  }  
+  }
+}
+
+/**
+  * @brief  I2C error callbacks.
+  * @param  I2cHandle: I2C handle
+  * @note   This example shows a simple way to report transfer error, and you can
+  *         add your own implementation.
+  * @retval None
+  */
+ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *I2cHandle)
+{
+  HAL_Delay(100);
 }
 
 /**
@@ -158,10 +288,12 @@ static void Error_Handler(void)
   /* User may add here some code to deal with this error */
   while(1)
   {
+    HAL_Delay(100);
   }
 }
 
 #ifdef  USE_FULL_ASSERT
+
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
@@ -173,7 +305,9 @@ void assert_failed(uint8_t* file, uint32_t line)
 { 
   /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-
+  char buffer[80];
+  sprintf(buffer, "\r\nassert_failed(). file: %s, line: %ld\r\n", (char *) file, line );
+  HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
   /* Infinite loop */
   while (1)
   {
