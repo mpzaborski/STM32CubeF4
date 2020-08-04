@@ -56,7 +56,8 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef UartHandle;
 I2C_HandleTypeDef I2cHandle;
-
+TIM_HandleTypeDef TimHandle;
+volatile uint8_t displayActive = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
@@ -93,6 +94,34 @@ void I2cInit(void)
   I2cHandle.Init.NoStretchMode   = I2C_NOSTRETCH_DISABLE;
 
   if(HAL_I2C_Init(&I2cHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    Error_Handler();
+  }
+}
+
+void TimerInit(void)
+{
+  uint32_t uwPrescalerValue;
+  /* Compute the prescaler value to have TIMx counter clock equal to 10000 Hz */
+  uwPrescalerValue = (uint32_t)(SystemCoreClock / 10000) - 1;
+
+  /* Set TIMx instance */
+  TimHandle.Instance = TIMx;
+
+  /* Initialize TIMx peripheral as follows:
+       + Period = 50000 - 1
+       + Prescaler = ((SystemCoreClock / 2)/10000) - 1
+       + ClockDivision = 0
+       + Counter direction = Up
+  */
+  TimHandle.Init.Period            = 50000 - 1;
+  TimHandle.Init.Prescaler         = uwPrescalerValue;
+  TimHandle.Init.ClockDivision     = 0;
+  TimHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
+  TimHandle.Init.RepetitionCounter = 0;
+  TimHandle.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&TimHandle) != HAL_OK)
   {
     /* Initialization Error */
     Error_Handler();
@@ -185,6 +214,7 @@ int main(void)
   EXTILine8_Config();
   UartInit();
   I2cInit();
+  TimerInit();
 
 
   result = mcp9808_read_manufacturer_id(buffer);
@@ -194,14 +224,18 @@ int main(void)
   HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
 
   ssd1306_Init();
+  ssd1306_WriteCommand(0xAE); //display off
 
   while(1)
   {
     /*##-5- Get the converted value of regular channel  ########################*/
     mcp9808_read_temperature(buffer);
 
-    HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
-    ssd1306_print_temperature(buffer);
+    if(displayActive)
+    {
+		HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
+		ssd1306_print_temperature(buffer);
+    }
     HAL_Delay(1000);
   }
 }
@@ -229,12 +263,20 @@ static void EXTILine8_Config(void)
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	displayActive = 0;
+	ssd1306_WriteCommand(0xAE); //display off
+	HAL_TIM_Base_Stop_IT(&TimHandle);
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  uint8_t buffer[20] = "success\n\r";
   if(GPIO_Pin == GPIO_PIN_8)
   {
-	  HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
+	  displayActive = 1;
+	  ssd1306_WriteCommand(0xAF); //display on
+	  HAL_TIM_Base_Start_IT(&TimHandle);
   }
 }
 

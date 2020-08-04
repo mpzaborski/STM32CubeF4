@@ -167,6 +167,28 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef *hi2c)
   /* Configure I2C Rx as alternate function  */
   HAL_GPIO_DeInit(I2Cx_SDA_GPIO_PORT, I2Cx_SDA_PIN);
 }
+
+/**
+  * @brief TIM MSP Initialization
+  *        This function configures the hardware resources used in this example:
+  *           - Peripheral's clock enable
+  *           - Peripheral's GPIO Configuration
+  * @param htim: TIM handle pointer
+  * @retval None
+  */
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
+{
+  /*##-1- Enable peripherals and GPIO Clocks #################################*/
+  /* TIMx Peripheral clock enable */
+  __HAL_RCC_TIM3_CLK_ENABLE();
+
+  /*##-2- Configure the NVIC for TIMx ########################################*/
+  /* Set Interrupt Group Priority */
+  HAL_NVIC_SetPriority(TIMx_IRQn, 4, 0);
+
+  /* Enable the TIMx global Interrupt */
+  HAL_NVIC_EnableIRQ(TIMx_IRQn);
+}
 /**
   * @}
   */

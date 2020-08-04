@@ -51,6 +51,7 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+extern TIM_HandleTypeDef    TimHandle;
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -171,6 +172,16 @@ void SysTick_Handler(void)
 void EXTI9_5_IRQHandler(void)
 {
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_8);
+}
+
+/**
+  * @brief  This function handles TIM interrupt request.
+  * @param  None
+  * @retval None
+  */
+void TIMx_IRQHandler(void)
+{
+  HAL_TIM_IRQHandler(&TimHandle);
 }
 
 /**
