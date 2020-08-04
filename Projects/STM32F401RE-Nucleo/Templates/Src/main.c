@@ -61,6 +61,7 @@ I2C_HandleTypeDef I2cHandle;
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
 static void Error_Handler(void);
+static void EXTILine8_Config(void);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -122,14 +123,14 @@ void mcp9808_read_temperature(char* result_buffer)
     temperature = temperature & 0x7ff;
     f_temperature = temperature * 0.0625;
     f_temperature *= 100;
-    sprintf(result_buffer, "-%d.%d C", (int)f_temperature / 100, ((int) f_temperature % 100)/10);
+    sprintf(result_buffer, "-%d.%d C\n\r", (int)f_temperature / 100, ((int) f_temperature % 100)/10);
   }
   else
   {
     temperature = temperature & 0x7ff;
     f_temperature = temperature * 0.0625;
     f_temperature *= 100;
-    sprintf(result_buffer, "%d.%d C", (int)f_temperature / 100, ((int) f_temperature % 100)/10);
+    sprintf(result_buffer, "%d.%d C\n\r", (int)f_temperature / 100, ((int) f_temperature % 100)/10);
   }
 }
 
@@ -181,9 +182,10 @@ int main(void)
   /* -1- Enable GPIOA Clock (to be able to program the configuration registers) */
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
-
+  EXTILine8_Config();
   UartInit();
   I2cInit();
+
 
   result = mcp9808_read_manufacturer_id(buffer);
 
@@ -204,6 +206,37 @@ int main(void)
   }
 }
 
+
+/**
+  * @brief  Configures EXTI Line8 (connected to PA8 pin) in interrupt mode
+  * @param  None
+  * @retval None
+  */
+static void EXTILine8_Config(void)
+{
+  GPIO_InitTypeDef   GPIO_InitStructure;
+
+  /* Enable GPIOA clock */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  GPIO_InitStructure.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStructure.Pin = GPIO_PIN_8;
+  GPIO_InitStructure.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
+  HAL_GPIO_WritePin(GPIOA,GPIO_PIN_8, GPIO_PIN_SET);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 2, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  uint8_t buffer[20] = "success\n\r";
+  if(GPIO_Pin == GPIO_PIN_8)
+  {
+	  HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
+  }
+}
 
 /**
   * @brief  System Clock Configuration
