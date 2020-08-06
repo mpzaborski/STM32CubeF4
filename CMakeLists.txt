@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15.3)
 
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
-project(STM32F401-Discovery)
+project(STM32F401RE-Nucleo)
 
 enable_language(C ASM)
 set(CMAKE_C_STANDARD 99)
@@ -11,8 +11,8 @@ set(PROGRAM_CMD ST-LINK_CLI.exe)
 
 
 set(STM32CUBEMX_GENERATED_FILES
-
         Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.c
+        Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c.c
         Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.c
         Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c
         Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.c
@@ -31,30 +31,35 @@ set(STM32CUBEMX_GENERATED_FILES
         Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pcd.c
         Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pcd_ex.c
         Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_usb.c
-
-
         Projects/${CMAKE_PROJECT_NAME}/Templates/Src/main.c
         Projects/${CMAKE_PROJECT_NAME}/Templates/Src/stm32f4xx_hal_msp.c
         Projects/${CMAKE_PROJECT_NAME}/Templates/Src/stm32f4xx_it.c
         Projects/${CMAKE_PROJECT_NAME}/Templates/Src/system_stm32f4xx.c
-        Projects/${CMAKE_PROJECT_NAME}/Templates/SW4STM32/startup_stm32f401xc.s)
+        Projects/${CMAKE_PROJECT_NAME}/Templates/stm32-ssd1306/ssd1306/ssd1306.c
+        Projects/${CMAKE_PROJECT_NAME}/Templates/stm32-ssd1306/ssd1306/ssd1306_fonts.c
+        Projects/${CMAKE_PROJECT_NAME}/Templates/SW4STM32/startup_stm32f401xe.s)
 
 message( ${CMAKE_SOURCE_DIR} )
 message(STATUS "My message")
 
-set(EXECUTABLE ${PROJECT_NAME}.out)
+set(EXECUTABLE ${PROJECT_NAME}.elf)
 add_executable(${EXECUTABLE} ${STM32CUBEMX_GENERATED_FILES})
 
 target_compile_definitions(${EXECUTABLE} PRIVATE
         -DUSE_HAL_DRIVER
         -DSTM32F413xx
+        -DSSD1306_USE_I2C
+        -DSSD1306_I2C_PORT=I2cHandle
+        -DSTM32F4
         )
 
 target_include_directories(${EXECUTABLE} PRIVATE
         Projects/${CMAKE_PROJECT_NAME}/Templates/Inc
+        Projects/${CMAKE_PROJECT_NAME}/Templates/stm32-ssd1306/ssd1306
         Drivers/STM32F4xx_HAL_Driver/Inc
         Drivers/CMSIS/Device/ST/STM32F4xx/Include
         Drivers/CMSIS/Include
+        Drivers/BSP/STM32F401-Discovery
         )
 
 target_compile_options(${EXECUTABLE} PRIVATE
@@ -72,12 +77,13 @@ target_compile_options(${EXECUTABLE} PRIVATE
         )
 
 target_link_options(${EXECUTABLE} PRIVATE
-        -T${CMAKE_SOURCE_DIR}/Projects/${CMAKE_PROJECT_NAME}/Templates/SW4STM32/STM32F401-Discovery/STM32F401VCTx_FLASH.ld
+        -T${CMAKE_SOURCE_DIR}/Projects/${CMAKE_PROJECT_NAME}/Templates/SW4STM32/STM32F4xx-Nucleo/STM32F401VEHx_FLASH.ld
         -mcpu=cortex-m4
         -mthumb
         -mfpu=fpv4-sp-d16
         -mfloat-abi=hard
         -specs=nano.specs
+        -specs=nosys.specs
         -lc
         -lm
         -lnosys
@@ -96,16 +102,16 @@ add_custom_command(TARGET ${EXECUTABLE}
         COMMAND arm-none-eabi-objcopy -O ihex ${EXECUTABLE} ${PROJECT_NAME}.hex
         COMMAND arm-none-eabi-objcopy -O binary ${EXECUTABLE} ${PROJECT_NAME}.bin)
 
-add_custom_target(program ALL)
+add_custom_target(program)
 add_dependencies(program ${EXECUTABLE})
 add_custom_command(TARGET program
     # On Visual Studio Generators, run before any other rules are executed within the target. On other generators, run just before PRE_LINK commands
     POST_BUILD
-    COMMAND ${PROGRAM_CMD} -ME -P ${PROJECT_NAME}.bin 0x08000000 -V -HardRst 
+    COMMAND ${PROGRAM_CMD} -ME -P ${PROJECT_NAME}.bin 0x08000000 -V -HardRst
     COMMENT "This command will be executed before building bar"
 )
 
 add_custom_target(erase
-    COMMAND ${PROGRAM_CMD} -ME
+    COMMAND ${PROGRAM_CMD} -ME -HardRst
     COMMENT "This command will be executed before building bar"
 )

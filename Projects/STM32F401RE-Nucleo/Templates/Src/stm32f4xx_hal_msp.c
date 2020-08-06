@@ -122,7 +122,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
 void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
 {
   GPIO_InitTypeDef  GPIO_InitStruct;
-  RCC_PeriphCLKInitTypeDef  RCC_PeriphCLKInitStruct;
 
   /*##-2- Enable peripherals and GPIO Clocks #################################*/
   /* Enable GPIO TX/RX clock */

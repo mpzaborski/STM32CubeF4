@@ -218,7 +218,7 @@ int main(void)
 
 
   result = mcp9808_read_manufacturer_id(buffer);
-
+  (void)result;
   assert_param(result == 0x54);
 
   HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
