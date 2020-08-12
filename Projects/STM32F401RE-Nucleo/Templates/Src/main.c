@@ -254,10 +254,10 @@ static void EXTILine8_Config(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   GPIO_InitStructure.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStructure.Pin = GPIO_PIN_8;
+  GPIO_InitStructure.Pin = GPIO_PIN_6;
   GPIO_InitStructure.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
-  HAL_GPIO_WritePin(GPIOA,GPIO_PIN_8, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA,GPIO_PIN_6, GPIO_PIN_SET);
 
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
@@ -272,7 +272,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if(GPIO_Pin == GPIO_PIN_8)
+  if(GPIO_Pin == GPIO_PIN_6)
   {
 	  displayActive = 1;
 	  ssd1306_WriteCommand(0xAF); //display on
