@@ -1,3 +1,6 @@
 [submodule "Projects/STM32F401RE-Nucleo/Templates/stm32-ssd1306"]
 	path = Projects/STM32F401RE-Nucleo/Templates/stm32-ssd1306
 	url = https://github.com/afiskon/stm32-ssd1306.git
+[submodule "Projects/STM32F401RE-Nucleo/Templates/BME280_driver"]
+	path = Projects/STM32F401RE-Nucleo/Templates/BME280_driver
+	url = https://github.com/BoschSensortec/BME280_driver.git
