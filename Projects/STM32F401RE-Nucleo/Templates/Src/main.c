@@ -36,6 +36,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "ssd1306.h"
+#include "bme280.h"
 #include "string.h"
 #include <stdio.h>
 
@@ -57,7 +58,10 @@
 UART_HandleTypeDef UartHandle;
 I2C_HandleTypeDef I2cHandle;
 TIM_HandleTypeDef TimHandle;
+struct bme280_dev bme_dev;
+
 volatile uint8_t displayActive = 0;
+
 
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
@@ -100,6 +104,72 @@ void I2cInit(void)
   }
 }
 
+int8_t user_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
+{
+  uint8_t dev_addr;
+  dev_addr = BME280_I2C_ADDR_PRIM;
+
+  HAL_StatusTypeDef status = HAL_OK;
+  int32_t iError = 0;
+  uint8_t array[40] = {0};
+  uint8_t stringpos = 0;
+  array[0] = reg_addr;
+
+  while (HAL_I2C_IsDeviceReady(&I2cHandle, (uint16_t)(dev_addr<<1), 3, 100) != HAL_OK) {}
+
+  status = HAL_I2C_Mem_Read(&I2cHandle,	  // i2c handle
+              (uint8_t)(dev_addr<<1), // i2c address, left aligned
+              (uint8_t)reg_addr,  // register address
+              I2C_MEMADD_SIZE_8BIT,			// bme280 uses 8bit register addresses
+              (uint8_t*)(array),			// write returned data to this variable
+              len,							// how many bytes to expect returned
+              HAL_MAX_DELAY);							// timeout
+
+    //while (HAL_I2C_IsDeviceReady(&I2cHandle, (uint8_t)(id.dev_addr<<1), 3, 100) != HAL_OK) {}
+
+    if (status != HAL_OK)
+    {
+      // The BME280 API calls for 0 return value as a success, and -1 returned as failure
+      iError = (-1);
+    }
+  for (stringpos = 0; stringpos < len; stringpos++) {
+    *(reg_data + stringpos) = array[stringpos];
+  }
+
+  return (int8_t)iError;
+}
+
+int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr)
+{
+  uint8_t dev_addr;
+  dev_addr = BME280_I2C_ADDR_PRIM;
+
+    HAL_StatusTypeDef status = HAL_OK;
+  int32_t iError = 0;
+
+  //while (HAL_I2C_IsDeviceReady(&I2cHandle, (uint8_t)(dev_addr<<1), 3, 100) != HAL_OK) {}
+
+    status = HAL_I2C_Mem_Write(&I2cHandle,						// i2c handle
+                (uint8_t)(dev_addr<<1),		// i2c address, left aligned
+                (uint8_t)reg_addr,			// register address
+                I2C_MEMADD_SIZE_8BIT,			// bme280 uses 8bit register addresses
+                (uint8_t*)(reg_data),		// write returned data to reg_data
+                len,							// write how many bytes
+                HAL_MAX_DELAY);							// timeout
+
+  if (status != HAL_OK)
+    {
+        // The BME280 API calls for 0 return value as a success, and -1 returned as failure
+      iError = (-1);
+    }
+  return (int8_t)iError;
+}
+
+void user_delay_us(uint32_t period, void *intf_ptr)
+{
+	HAL_Delay(period/1000);
+}
+
 void TimerInit(void)
 {
   uint32_t uwPrescalerValue;
@@ -126,6 +196,46 @@ void TimerInit(void)
     /* Initialization Error */
     Error_Handler();
   }
+}
+
+int8_t bme280_sensor_init(struct bme280_dev  *dev)
+{
+  int8_t rslt = BME280_OK;
+  uint8_t dev_addr = BME280_I2C_ADDR_PRIM;
+  uint8_t sensor_mode;
+
+  dev->intf_ptr = &dev_addr;
+  dev->intf = BME280_I2C_INTF;
+  dev->read = user_i2c_read;
+  dev->write = user_i2c_write;
+  dev->delay_us = user_delay_us;
+
+  rslt = bme280_init(dev);
+  bme280_get_sensor_mode(&sensor_mode, dev);
+  return rslt;
+}
+
+int8_t stream_sensor_data_normal_mode(struct bme280_dev *dev)
+{
+  int8_t rslt;
+  uint8_t settings_sel;
+
+  /* Recommended mode of operation: Indoor navigation */
+  dev->settings.osr_h = BME280_OVERSAMPLING_1X;
+  dev->settings.osr_p = BME280_OVERSAMPLING_16X;
+  dev->settings.osr_t = BME280_OVERSAMPLING_2X;
+  dev->settings.filter = BME280_FILTER_COEFF_16;
+  dev->settings.standby_time = BME280_STANDBY_TIME_62_5_MS;
+
+  settings_sel = BME280_OSR_PRESS_SEL;
+  settings_sel |= BME280_OSR_TEMP_SEL;
+  settings_sel |= BME280_OSR_HUM_SEL;
+  settings_sel |= BME280_STANDBY_SEL;
+  settings_sel |= BME280_FILTER_SEL;
+  rslt = bme280_set_sensor_settings(settings_sel, dev);
+  rslt = bme280_set_sensor_mode(BME280_NORMAL_MODE, dev);
+
+  return rslt;
 }
 
 #define POSITIVE_TEMPERATURE_RANGE 0x7FF
@@ -174,13 +284,22 @@ uint16_t mcp9808_read_manufacturer_id(char* buffer)
   return manufacturer_id;
 }
 
-void ssd1306_print_temperature(char* buffer)
+void ssd1306_print_measurements(int32_t temperature, uint32_t humidity, uint32_t pressure)
 {
+  char buffer[20];
+
   ssd1306_Fill(White);
   ssd1306_SetCursor(2, 0);
-  ssd1306_WriteString("Temperature", Font_11x18, Black);
-  ssd1306_SetCursor(2,18);
+  sprintf(buffer, "%d.%d C\n\r",temperature / 100, (temperature % 100) / 10);
   ssd1306_WriteString(buffer, Font_11x18, Black);
+  ssd1306_DrawCircle(54,3,2,Black);
+  ssd1306_SetCursor(2,18);
+  sprintf(buffer, "%d.%d %%\n\r", humidity /1024, (humidity % 1024) / 102);
+  ssd1306_WriteString(buffer, Font_11x18, Black);
+  ssd1306_SetCursor(2,36);
+  sprintf(buffer, "%d.%1.d hPa\n\r",pressure /100, (pressure % 100) / 10);
+  ssd1306_WriteString(buffer, Font_11x18, Black);
+
   ssd1306_UpdateScreen();
 }
 
@@ -192,8 +311,6 @@ void ssd1306_print_temperature(char* buffer)
 int main(void)
 {
   char buffer[40];
-  uint16_t result;
-
   /* STM32F4xx HAL library initialization:
        - Configure the Flash prefetch, Flash preread and Buffer caches
        - Systick timer is configured by default as source of time base, but user
@@ -215,26 +332,23 @@ int main(void)
   UartInit();
   I2cInit();
   TimerInit();
+  bme280_sensor_init(&bme_dev);
 
-
-  result = mcp9808_read_manufacturer_id(buffer);
-  (void)result;
-  assert_param(result == 0x54);
-
-  HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
+  struct bme280_data bme280_d;
 
   ssd1306_Init();
   ssd1306_WriteCommand(0xAE); //display off
 
+  stream_sensor_data_normal_mode(&bme_dev);
+
   while(1)
   {
-    /*##-5- Get the converted value of regular channel  ########################*/
-    mcp9808_read_temperature(buffer);
-
+	bme280_get_sensor_data(BME280_ALL, &bme280_d, &bme_dev);
     if(displayActive)
     {
-		HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
-		ssd1306_print_temperature(buffer);
+      sprintf(buffer, "T:%d, H:%d P:%d\n\r",bme280_d.temperature, bme280_d.humidity, bme280_d.pressure);
+      HAL_UART_Transmit(&UartHandle, (uint8_t*)buffer, strlen(buffer), 10);
+      ssd1306_print_measurements(bme280_d.temperature, bme280_d.humidity, bme280_d.pressure);
     }
     HAL_Delay(1000);
   }
@@ -250,7 +364,6 @@ static void EXTILine8_Config(void)
 {
   GPIO_InitTypeDef   GPIO_InitStructure;
 
-  /* Enable GPIOA clock */
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   GPIO_InitStructure.Mode = GPIO_MODE_IT_FALLING;
@@ -265,18 +378,18 @@ static void EXTILine8_Config(void)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	displayActive = 0;
-	ssd1306_WriteCommand(0xAE); //display off
-	HAL_TIM_Base_Stop_IT(&TimHandle);
+  displayActive = 0;
+  ssd1306_WriteCommand(0xAE); //display off
+  HAL_TIM_Base_Stop_IT(&TimHandle);
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if(GPIO_Pin == GPIO_PIN_6)
   {
-	  displayActive = 1;
-	  ssd1306_WriteCommand(0xAF); //display on
-	  HAL_TIM_Base_Start_IT(&TimHandle);
+    displayActive = 1;
+    ssd1306_WriteCommand(0xAF); //display on
+    HAL_TIM_Base_Start_IT(&TimHandle);
   }
 }
 

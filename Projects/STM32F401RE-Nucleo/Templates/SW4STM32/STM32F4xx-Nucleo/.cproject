@@ -58,7 +58,7 @@
 									<listOptionValue builtIn="false" value="USE_FULL_ASSERT"/>
 									<listOptionValue builtIn="false" value="BME280_32BIT_ENABLE"/>
 								</option>
-								<option id="com.atollic.truestudio.gcc.misc.otherflags.1798804680" name="Other options" superClass="com.atollic.truestudio.gcc.misc.otherflags" useByScannerDiscovery="false" value="-fmessage-length=0 -Wno-unused-variable -Wno-pointer-sign -Wno-main -Wno-format -Wno-address -Wno-unused-but-set-variable -Wno-strict-aliasing -Wno-parentheses -Wno-missing-braces" valueType="string"/>
+								<option id="com.atollic.truestudio.gcc.misc.otherflags.1798804680" name="Other options" superClass="com.atollic.truestudio.gcc.misc.otherflags" useByScannerDiscovery="false" value="-fmessage-length=0 -Wno-pointer-sign -Wno-main -Wno-format -Wno-address -Wno-unused-but-set-variable -Wno-strict-aliasing -Wno-parentheses -Wno-missing-braces" valueType="string"/>
 								<option id="com.atollic.truestudio.common_options.target.mcpu.974117213" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" useByScannerDiscovery="false" value="STM32F401RE" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.instr_set.808617935" name="Instruction set" superClass="com.atollic.truestudio.common_options.target.instr_set" useByScannerDiscovery="false" value="com.atollic.truestudio.common_options.target.instr_set.thumb2" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.fpu.1379824152" name="Floating point" superClass="com.atollic.truestudio.common_options.target.fpu" useByScannerDiscovery="false" value="com.atollic.truestudio.common_options.target.fpu.hard" valueType="enumerated"/>
@@ -126,10 +126,10 @@
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 	<storageModule moduleId="refreshScope" versionNumber="2">
-		<configuration artifactName="STM32F4xx-Nucleo" configurationName="Debug">
+		<configuration configurationName="Debug">
 			<resource resourceType="PROJECT" workspacePath="/STM32F4xx-Nucleo"/>
 		</configuration>
-		<configuration artifactName="STM32F4xx-Nucleo" configurationName="Release">
+		<configuration configurationName="Release">
 			<resource resourceType="PROJECT" workspacePath="/STM32F4xx-Nucleo"/>
 		</configuration>
 	</storageModule>
