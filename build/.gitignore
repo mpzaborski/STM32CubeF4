@@ -1,9 +1,0 @@
-*.bin
-*.elf
-*.hex
-*.map
-cmake_install.make
-Makefile
-CMakeCache.txt
-cmake_install.cmake
-CMakeFiles

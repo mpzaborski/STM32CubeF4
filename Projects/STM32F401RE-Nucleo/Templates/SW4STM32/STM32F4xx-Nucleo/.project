@@ -311,6 +311,11 @@
 			<location>C:/Users/mpzab/projects/STM32CubeF4/Projects/STM32F401RE-Nucleo/Templates/BME280_driver</location>
 		</link>
 		<link>
+			<name>Example/User/bme280_port.c</name>
+			<type>1</type>
+			<location>C:/Users/mpzab/projects/STM32CubeF4/Projects/STM32F401RE-Nucleo/Templates/Src/bme280_port.c</location>
+		</link>
+		<link>
 			<name>Example/User/main.c</name>
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/Src/main.c</locationURI>

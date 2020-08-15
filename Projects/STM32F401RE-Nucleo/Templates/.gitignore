@@ -1,0 +1,10 @@
+build/CMakeCache.txt
+build/CMakeFiles/
+build/Makefile
+build/*.bin
+build/*.elf
+build/*.hex
+build/*.map
+build/cmake_install.cmake
+SW4STM32/STM32F4xx-Nucleo/.settings/*
+SW4STM32/STM32F4xx-Nucleo/Debug_STM32F401RE_FLASH.ld
